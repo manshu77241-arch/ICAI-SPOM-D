@@ -2280,6 +2280,37 @@ export default function App() {
     return [...arr].sort(() => Math.random() - 0.5);
   }
 
+  const handleAutoNext = React.useCallback(() => {
+    const currentQ = quizQuestions[currentIndex];
+    const isCorrect = selectedOption === currentQ.answer;
+    if (!isCorrect) {
+      setIncorrectQuestions(prev => [...prev, currentIndex]);
+      setWrongAnswers(prev => [...prev, currentQ]);
+    }
+    setChapterScores(prev => {
+      const ch = currentQ.chapter;
+      const newScores = { ...prev };
+      if (!newScores[ch]) newScores[ch] = { correct: 0, total: 0 };
+      newScores[ch].total += 1;
+      if (isCorrect) newScores[ch].correct += 1;
+      return newScores;
+    });
+
+    if (currentIndex < quizQuestions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setSelectedOption(null);
+      setTimeLeft(30);
+      setAnimationKey(prev => prev + 1);
+    } else {
+      setMode('review');
+    }
+  }, [currentIndex, quizQuestions, selectedOption]);
+
+  const handleNext = React.useCallback(() => {
+    if (!selectedOption) return;
+    handleAutoNext();
+  }, [selectedOption, handleAutoNext]);
+
   // Keyboard navigation
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -2354,37 +2385,6 @@ export default function App() {
   const handleFullSyllabus = () => {
     setFullSyllabus(true);
     setSelectedChapter(null);
-  };
-
-  const handleAutoNext = () => {
-    const currentQ = quizQuestions[currentIndex];
-    const isCorrect = selectedOption === currentQ.answer;
-    if (!isCorrect) {
-      setIncorrectQuestions(prev => [...prev, currentIndex]);
-      setWrongAnswers(prev => [...prev, currentQ]);
-    }
-    setChapterScores(prev => {
-      const ch = currentQ.chapter;
-      const newScores = { ...prev };
-      if (!newScores[ch]) newScores[ch] = { correct: 0, total: 0 };
-      newScores[ch].total += 1;
-      if (isCorrect) newScores[ch].correct += 1;
-      return newScores;
-    });
-
-    if (currentIndex < quizQuestions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setSelectedOption(null);
-      setTimeLeft(30);
-      setAnimationKey(prev => prev + 1);
-    } else {
-      setMode('review');
-    }
-  };
-
-  const handleNext = () => {
-    if (!selectedOption) return;
-    handleAutoNext();
   };
 
   const endExam = () => {
