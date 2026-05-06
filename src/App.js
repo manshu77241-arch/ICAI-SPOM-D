@@ -2273,7 +2273,6 @@ export default function App() {
   const [totalTime, setTotalTime] = useState(0);
   const [incorrectQuestions, setIncorrectQuestions] = useState([]);
   const [chapterScores, setChapterScores] = useState({});
-  const [startTime, setStartTime] = useState(null);
   const [animationKey, setAnimationKey] = useState(0); // for animations
   const [wrongAnswers, setWrongAnswers] = useState([]);
 
@@ -2297,7 +2296,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, currentIndex, selectedOption, quizQuestions]);
+  }, [mode, currentIndex, selectedOption, quizQuestions, handleNext]);
 
   // Timer effect
   React.useEffect(() => {
@@ -2315,7 +2314,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [mode, currentIndex, selectedOption, quizQuestions]);
+  }, [mode, currentIndex, selectedOption, quizQuestions, handleAutoNext]);
 
   const getUniqueChapters = () => {
     const chapters = [...new Set(questions.map(q => q.chapter))];
@@ -2343,7 +2342,6 @@ export default function App() {
     setIncorrectQuestions([]);
     setChapterScores({});
     setWrongAnswers([]);
-    setStartTime(Date.now());
     setMode('quiz');
     setAnimationKey(prev => prev + 1);
   };
@@ -2417,7 +2415,6 @@ export default function App() {
     setTotalTime(0);
     setIncorrectQuestions([]);
     setChapterScores({});
-    setStartTime(null);
   };
 
   const startReview = () => {
@@ -2434,10 +2431,6 @@ export default function App() {
     setIncorrectQuestions([]);
     setMode('review');
     setAnimationKey(prev => prev + 1);
-  };
-
-  const finishReview = () => {
-    setMode('results');
   };
 
   const formatTime = (seconds) => {
