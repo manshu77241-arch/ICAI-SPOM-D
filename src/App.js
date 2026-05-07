@@ -2629,7 +2629,7 @@ export default function App() {
           </button>
         </div>
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal
+          Developed by Manshu Deswal | Reviewed by Ritik Gupta
         </footer>
       </div>
     );
@@ -2829,7 +2829,7 @@ export default function App() {
         )}
 
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal
+          Developed by Manshu Deswal | Reviewed by Ritik Gupta
         </footer>
       </div>
     );
@@ -2884,7 +2884,7 @@ export default function App() {
           </div>
         </div>
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal
+          Developed by Manshu Deswal | Reviewed by Ritik Gupta
         </footer>
       </div>
     );
@@ -3075,7 +3075,7 @@ export default function App() {
           </div>
         </div>
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal
+          Developed by Manshu Deswal | Reviewed by Ritik Gupta
         </footer>
       </div>
     );
