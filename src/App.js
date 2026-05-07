@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { FaInstagram, FaLinkedin } from "react-icons/fa";
 
 const selectSound = new Audio("/sounds/mixkit-select-click-1109.wav");
 
@@ -2284,20 +2285,24 @@ export default function App() {
 
   const handleAutoNext = React.useCallback(() => {
     const currentQ = quizQuestions[currentIndex];
-    const isCorrect = selectedOption === currentQ.answer;
-    if (!isCorrect) {
-      setIncorrectQuestions(prev => [...prev, currentIndex]);
-      setWrongAnswers(prev => [...prev, { ...currentQ, selected: selectedOption }] );
-    } else {
-      setScore(prev => prev + 1);
-    }
-    if (selectedOption !== null) {
+    const currentAnswer = answers[currentIndex] ?? selectedOption;
+    const isCorrect = currentAnswer === currentQ.answer;
+
+    if (currentAnswer !== undefined) {
+      if (!isCorrect) {
+        setIncorrectQuestions(prev => [...prev, currentIndex]);
+        setWrongAnswers(prev => [...prev, { ...currentQ, selected: currentAnswer }] );
+      } else {
+        setScore(prev => prev + 1);
+      }
+
       setAnswers(prev => {
         const updated = [...prev];
-        updated[currentIndex] = selectedOption;
+        updated[currentIndex] = currentAnswer;
         return updated;
       });
     }
+
     setChapterScores(prev => {
       const ch = currentQ.chapter;
       const newScores = { ...prev };
@@ -2315,12 +2320,34 @@ export default function App() {
     } else {
       setMode('review');
     }
-  }, [currentIndex, quizQuestions, selectedOption]);
+  }, [currentIndex, quizQuestions, selectedOption, answers]);
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleOptionSelect = (option) => {
+    setAnswers(prev => {
+      const updated = [...prev];
+      updated[currentIndex] = option;
+      return updated;
+    });
+    setSelectedOption(option);
+    selectSound.currentTime = 0;
+    selectSound.play();
+  };
 
   const handleNext = React.useCallback(() => {
-    if (!selectedOption) return;
+    const currentAnswer = answers[currentIndex] ?? selectedOption;
+    if (!currentAnswer) return;
     handleAutoNext();
-  }, [selectedOption, handleAutoNext]);
+  }, [selectedOption, handleAutoNext, answers, currentIndex]);
+
+  useEffect(() => {
+    setSelectedOption(answers[currentIndex] ?? null);
+  }, [currentIndex, answers]);
 
   // Keyboard navigation
   React.useEffect(() => {
@@ -2706,33 +2733,8 @@ export default function App() {
             {currentQ.options.map((option, idx) => (
               <button
                 key={idx}
-                onClick={() => {
-                  setSelectedOption(option);
-                  setAnswers(prev => {
-                    const updated = [...prev];
-                    updated[currentIndex] = option;
-                    return updated;
-                  });
-                  selectSound.currentTime = 0;
-                  selectSound.play();
-                }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '15px',
-                  margin: '10px 0',
-                  textAlign: 'left',
-                  border: selectedOption === option ? '3px solid #4CAF50' : '2px solid rgba(255,255,255,0.3)',
-                  borderRadius: '10px',
-                  background: selectedOption === option ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  transition: 'all 0.3s ease',
-                  transform: selectedOption === option ? 'scale(1.02)' : 'scale(1)',
-                }}
-                onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                onMouseLeave={(e) => e.target.style.transform = selectedOption === option ? 'scale(1.02)' : 'scale(1)'}
+                className={answers[currentIndex] === option ? 'selected-option' : 'option-button'}
+                onClick={() => handleOptionSelect(option)}
               >
                 {String.fromCharCode(65 + idx)}. {option}
               </button>
@@ -2740,20 +2742,21 @@ export default function App() {
           </div>
 
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div className="navigation-buttons">
+            <button
+              onClick={handlePrevious}
+              disabled={currentIndex === 0}
+            >
+              Previous
+            </button>
             <button
               onClick={handleNext}
-              disabled={!selectedOption}
-              style={{
-                ...buttonStyle,
-                background: selectedOption ? '#4CAF50' : 'rgba(255,255,255,0.2)',
-                color: selectedOption ? '#fff' : '#ccc',
-                flex: 1,
-                opacity: selectedOption ? 1 : 0.5,
-              }}
+              disabled={!answers[currentIndex] && !selectedOption}
             >
-              {currentIndex === quizQuestions.length - 1 ? 'Finish' : 'Next'}
+              {currentIndex === quizQuestions.length - 1 ? 'Finish' : 'Save & Next'}
             </button>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', marginTop: '10px' }}>
             <button
               onClick={() => setShowEndConfirm(true)}
               style={{
@@ -2881,6 +2884,51 @@ export default function App() {
             >
               Skip to Results
             </button>
+          </div>
+          <div className="social-section">
+            <h2>Connect With Us</h2>
+            <div className="developer-card">
+              <h3>Developed by Manshu Deswal</h3>
+              <div className="social-links">
+                <a
+                  href="https://www.linkedin.com/in/manshu2036?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaLinkedin />
+                  LinkedIn
+                </a>
+                <a
+                  href="https://www.instagram.com/manshu__deswal?igsh=MWt4bmc1aGxmbXgwbA=="
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaInstagram />
+                  Instagram
+                </a>
+              </div>
+            </div>
+            <div className="developer-card">
+              <h3>Reviewed & Suggested by Ritik Gupta</h3>
+              <div className="social-links">
+                <a
+                  href="https://www.linkedin.com/in/ritik-gupta-a326b827a?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaLinkedin />
+                  LinkedIn
+                </a>
+                <a
+                  href="https://www.instagram.com/__ritik_gupta_?igsh=MWo0enZ3djJhMW8yYQ=="
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaInstagram />
+                  Instagram
+                </a>
+              </div>
+            </div>
           </div>
         </div>
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
@@ -3048,6 +3096,53 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Social Links */}
+          <div className="social-section">
+            <h2>Connect With Us</h2>
+            <div className="developer-card">
+              <h3>Developed by Manshu Deswal</h3>
+              <div className="social-links">
+                <a
+                  href="https://www.linkedin.com/in/manshu2036?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaLinkedin />
+                  LinkedIn
+                </a>
+                <a
+                  href="https://www.instagram.com/manshu__deswal?igsh=MWt4bmc1aGxmbXgwbA=="
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaInstagram />
+                  Instagram
+                </a>
+              </div>
+            </div>
+            <div className="developer-card">
+              <h3>Reviewed & Suggested by Ritik Gupta</h3>
+              <div className="social-links">
+                <a
+                  href="https://www.linkedin.com/in/ritik-gupta-a326b827a?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaLinkedin />
+                  LinkedIn
+                </a>
+                <a
+                  href="https://www.instagram.com/__ritik_gupta_?igsh=MWo0enZ3djJhMW8yYQ=="
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <FaInstagram />
+                  Instagram
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* Buttons */}
