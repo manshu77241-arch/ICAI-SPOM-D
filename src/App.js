@@ -2268,6 +2268,7 @@ export default function App() {
   const [quizQuestions, setQuizQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
+  const [answers, setAnswers] = useState([]);
   const [timeLeft, setTimeLeft] = useState(30);
   const [score, setScore] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
@@ -2285,7 +2286,16 @@ export default function App() {
     const isCorrect = selectedOption === currentQ.answer;
     if (!isCorrect) {
       setIncorrectQuestions(prev => [...prev, currentIndex]);
-      setWrongAnswers(prev => [...prev, currentQ]);
+      setWrongAnswers(prev => [...prev, { ...currentQ, selected: selectedOption }] );
+    } else {
+      setScore(prev => prev + 1);
+    }
+    if (selectedOption !== null) {
+      setAnswers(prev => {
+        const updated = [...prev];
+        updated[currentIndex] = selectedOption;
+        return updated;
+      });
     }
     setChapterScores(prev => {
       const ch = currentQ.chapter;
@@ -2367,6 +2377,7 @@ export default function App() {
     setQuizQuestions(selectedQuestions);
     setCurrentIndex(0);
     setSelectedOption(null);
+    setAnswers([]);
     setTimeLeft(30);
     setScore(0);
     setTotalTime(0);
@@ -2388,18 +2399,50 @@ export default function App() {
   };
 
   const endExam = () => {
-    // Mark remaining questions as incorrect if not answered
-    for (let i = currentIndex; i < quizQuestions.length; i++) {
-      const q = quizQuestions[i];
-      setIncorrectQuestions(prev => [...prev, i]);
-      setChapterScores(prev => {
-        const ch = q.chapter;
-        const newScores = { ...prev };
-        if (!newScores[ch]) newScores[ch] = { correct: 0, total: 0 };
-        newScores[ch].total += 1;
-        return newScores;
-      });
+    const updatedAnswers = [...answers];
+    if (selectedOption !== null) {
+      updatedAnswers[currentIndex] = selectedOption;
     }
+
+    let correctCount = 0;
+    updatedAnswers.forEach((answer, index) => {
+      if (answer !== undefined && quizQuestions[index]?.answer === answer) {
+        correctCount += 1;
+      }
+    });
+    setScore(correctCount);
+
+    const newIncorrectQuestions = [...incorrectQuestions];
+    const newWrongAnswers = [...wrongAnswers];
+    const newChapterScores = { ...chapterScores };
+    let startIndex = currentIndex;
+
+    if (selectedOption !== null) {
+      const currentQ = quizQuestions[currentIndex];
+      const isCorrect = selectedOption === currentQ.answer;
+      if (!isCorrect) {
+        newIncorrectQuestions.push(currentIndex);
+        newWrongAnswers.push({ ...currentQ, selected: selectedOption });
+      }
+      const ch = currentQ.chapter;
+      if (!newChapterScores[ch]) newChapterScores[ch] = { correct: 0, total: 0 };
+      newChapterScores[ch].total += 1;
+      if (isCorrect) newChapterScores[ch].correct += 1;
+      startIndex = currentIndex + 1;
+    }
+
+    for (let i = startIndex; i < quizQuestions.length; i++) {
+      const q = quizQuestions[i];
+      const ch = q.chapter;
+      if (!newChapterScores[ch]) newChapterScores[ch] = { correct: 0, total: 0 };
+      newChapterScores[ch].total += 1;
+      newIncorrectQuestions.push(i);
+    }
+
+    setAnswers(updatedAnswers);
+    setIncorrectQuestions(newIncorrectQuestions);
+    setWrongAnswers(newWrongAnswers);
+    setChapterScores(newChapterScores);
     setMode('results');
   };
 
@@ -2410,6 +2453,7 @@ export default function App() {
     setQuizQuestions([]);
     setCurrentIndex(0);
     setSelectedOption(null);
+    setAnswers([]);
     setTimeLeft(30);
     setScore(0);
     setTotalTime(0);
@@ -2425,6 +2469,7 @@ export default function App() {
     setQuizQuestions(incorrectQuestions.map(i => quizQuestions[i]));
     setCurrentIndex(0);
     setSelectedOption(null);
+    setAnswers([]);
     setTimeLeft(30);
     setScore(0);
     setTotalTime(0);
@@ -2652,6 +2697,11 @@ export default function App() {
                 key={idx}
                 onClick={() => {
                   setSelectedOption(option);
+                  setAnswers(prev => {
+                    const updated = [...prev];
+                    updated[currentIndex] = option;
+                    return updated;
+                  });
                   selectSound.currentTime = 0;
                   selectSound.play();
                 }}
@@ -2888,7 +2938,27 @@ export default function App() {
               {wrongAnswers.map((q, i) => (
                 <div key={i} style={{ marginBottom: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
                   <p style={{ color: '#fff', margin: '0 0 10px 0' }}><b>Q:</b> {q.question}</p>
-                  <p style={{ color: '#4CAF50', margin: '0 0 10px 0' }}><b>Correct:</b> {q.answer}</p>
+                  {q.options.map((option, idx) => {
+                    const isSelected = option === q.selected;
+                    const isCorrect = option === q.answer;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '10px',
+                          marginBottom: '8px',
+                          borderRadius: '6px',
+                          border: '1px solid #ccc',
+                          backgroundColor: isCorrect ? '#c8f7c5' : isSelected ? '#f7c5c5' : '#fff',
+                          color: '#000',
+                        }}
+                      >
+                        {option}
+                        {isSelected && !isCorrect && <span> ❌ Your Answer</span>}
+                        {isCorrect && <span> ✅ Correct Answer</span>}
+                      </div>
+                    );
+                  })}
                   <p style={{ color: '#e0e0e0', margin: '0' }}><b>Explanation:</b> {q.explanation || "No explanation available"}</p>
                 </div>
               ))}
