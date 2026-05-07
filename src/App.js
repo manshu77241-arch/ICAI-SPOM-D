@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
+import "./App.css";
 
 const selectSound = new Audio("/sounds/mixkit-select-click-1109.wav");
 
@@ -2273,54 +2274,42 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [score, setScore] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
-  const [incorrectQuestions, setIncorrectQuestions] = useState([]);
   const [chapterScores, setChapterScores] = useState({});
   const [animationKey, setAnimationKey] = useState(0); // for animations
-  const [wrongAnswers, setWrongAnswers] = useState([]);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [reviewFlags, setReviewFlags] = useState({});
 
   function shuffleArray(arr) {
     return [...arr].sort(() => Math.random() - 0.5);
   }
 
-  const handleAutoNext = React.useCallback(() => {
-    const currentQ = quizQuestions[currentIndex];
-    const currentAnswer = answers[currentIndex] ?? selectedOption;
-    const isCorrect = currentAnswer === currentQ.answer;
-
-    if (currentAnswer !== undefined) {
-      if (!isCorrect) {
-        setIncorrectQuestions(prev => [...prev, currentIndex]);
-        setWrongAnswers(prev => [...prev, { ...currentQ, selected: currentAnswer }] );
-      } else {
-        setScore(prev => prev + 1);
-      }
-
-      setAnswers(prev => {
-        const updated = [...prev];
-        updated[currentIndex] = currentAnswer;
-        return updated;
-      });
-    }
-
-    setChapterScores(prev => {
-      const ch = currentQ.chapter;
-      const newScores = { ...prev };
-      if (!newScores[ch]) newScores[ch] = { correct: 0, total: 0 };
-      newScores[ch].total += 1;
-      if (isCorrect) newScores[ch].correct += 1;
-      return newScores;
+  const saveCurrentAnswer = React.useCallback((currentAnswer) => {
+    if (currentAnswer === null || currentAnswer === undefined) return;
+    setAnswers(prev => {
+      const updated = [...prev];
+      updated[currentIndex] = currentAnswer;
+      return updated;
     });
+  }, [currentIndex]);
 
+  const goToNextQuestion = React.useCallback(() => {
     if (currentIndex < quizQuestions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex(prev => prev + 1);
       setSelectedOption(null);
       setTimeLeft(30);
       setAnimationKey(prev => prev + 1);
     } else {
-      setMode('review');
+      setMode('results');
     }
-  }, [currentIndex, quizQuestions, selectedOption, answers]);
+  }, [currentIndex, quizQuestions.length]);
+
+  const handleAutoNext = React.useCallback(() => {
+    const currentAnswer = selectedOption ?? answers[currentIndex];
+    if (currentAnswer !== undefined && currentAnswer !== null) {
+      saveCurrentAnswer(currentAnswer);
+    }
+    goToNextQuestion();
+  }, [selectedOption, answers, currentIndex, goToNextQuestion, saveCurrentAnswer]);
 
   const handlePrevious = () => {
     if (currentIndex > 0) {
@@ -2329,12 +2318,8 @@ export default function App() {
   };
 
   const handleOptionSelect = (option) => {
-    setAnswers(prev => {
-      const updated = [...prev];
-      updated[currentIndex] = option;
-      return updated;
-    });
     setSelectedOption(option);
+    saveCurrentAnswer(option);
     selectSound.currentTime = 0;
     selectSound.play();
   };
@@ -2342,12 +2327,41 @@ export default function App() {
   const handleNext = React.useCallback(() => {
     const currentAnswer = answers[currentIndex] ?? selectedOption;
     if (!currentAnswer) return;
-    handleAutoNext();
-  }, [selectedOption, handleAutoNext, answers, currentIndex]);
+    saveCurrentAnswer(currentAnswer);
+    goToNextQuestion();
+  }, [selectedOption, answers, currentIndex, goToNextQuestion, saveCurrentAnswer]);
 
   useEffect(() => {
     setSelectedOption(answers[currentIndex] ?? null);
   }, [currentIndex, answers]);
+
+  useEffect(() => {
+    const newScore = answers.reduce((count, answer, index) => {
+      if (answer !== undefined && quizQuestions[index]?.answer === answer) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+    setScore(newScore);
+  }, [answers, quizQuestions]);
+
+  useEffect(() => {
+    const updatedChapterScores = quizQuestions.reduce((totals, question, index) => {
+      const answer = answers[index];
+      const chapter = question.chapter;
+      if (!totals[chapter]) {
+        totals[chapter] = { correct: 0, total: 0 };
+      }
+      if (answer !== undefined) {
+        totals[chapter].total += 1;
+        if (answer === question.answer) {
+          totals[chapter].correct += 1;
+        }
+      }
+      return totals;
+    }, {});
+    setChapterScores(updatedChapterScores);
+  }, [answers, quizQuestions]);
 
   // Keyboard navigation
   React.useEffect(() => {
@@ -2390,6 +2404,19 @@ export default function App() {
     return chapters.sort();
   };
 
+  const getQuestionStatus = (index) => {
+    if (reviewFlags[index]) return 'review';
+    if (answers[index] === undefined) return 'unanswered';
+    return 'answered';
+  };
+
+  const toggleReviewFlag = () => {
+    setReviewFlags(prev => ({
+      ...prev,
+      [currentIndex]: !prev[currentIndex],
+    }));
+  };
+
   const startQuiz = () => {
     let selectedQuestions = [];
     if (fullSyllabus) {
@@ -2409,9 +2436,7 @@ export default function App() {
     setTimeLeft(30);
     setScore(0);
     setTotalTime(0);
-    setIncorrectQuestions([]);
     setChapterScores({});
-    setWrongAnswers([]);
     setMode('quiz');
     setAnimationKey(prev => prev + 1);
   };
@@ -2427,50 +2452,10 @@ export default function App() {
   };
 
   const endExam = () => {
-    const updatedAnswers = [...answers];
-    if (selectedOption !== null) {
-      updatedAnswers[currentIndex] = selectedOption;
+    const currentAnswer = selectedOption ?? answers[currentIndex];
+    if (currentAnswer !== undefined && currentAnswer !== null) {
+      saveCurrentAnswer(currentAnswer);
     }
-
-    let correctCount = 0;
-    updatedAnswers.forEach((answer, index) => {
-      if (answer !== undefined && quizQuestions[index]?.answer === answer) {
-        correctCount += 1;
-      }
-    });
-    setScore(correctCount);
-
-    const newIncorrectQuestions = [...incorrectQuestions];
-    const newWrongAnswers = [...wrongAnswers];
-    const newChapterScores = { ...chapterScores };
-    let startIndex = currentIndex;
-
-    if (selectedOption !== null) {
-      const currentQ = quizQuestions[currentIndex];
-      const isCorrect = selectedOption === currentQ.answer;
-      if (!isCorrect) {
-        newIncorrectQuestions.push(currentIndex);
-        newWrongAnswers.push({ ...currentQ, selected: selectedOption });
-      }
-      const ch = currentQ.chapter;
-      if (!newChapterScores[ch]) newChapterScores[ch] = { correct: 0, total: 0 };
-      newChapterScores[ch].total += 1;
-      if (isCorrect) newChapterScores[ch].correct += 1;
-      startIndex = currentIndex + 1;
-    }
-
-    for (let i = startIndex; i < quizQuestions.length; i++) {
-      const q = quizQuestions[i];
-      const ch = q.chapter;
-      if (!newChapterScores[ch]) newChapterScores[ch] = { correct: 0, total: 0 };
-      newChapterScores[ch].total += 1;
-      newIncorrectQuestions.push(i);
-    }
-
-    setAnswers(updatedAnswers);
-    setIncorrectQuestions(newIncorrectQuestions);
-    setWrongAnswers(newWrongAnswers);
-    setChapterScores(newChapterScores);
     setMode('results');
   };
 
@@ -2485,23 +2470,28 @@ export default function App() {
     setTimeLeft(30);
     setScore(0);
     setTotalTime(0);
-    setIncorrectQuestions([]);
     setChapterScores({});
   };
 
   const startReview = () => {
-    if (incorrectQuestions.length === 0) {
+    const wrongIndexes = quizQuestions.reduce((indexes, question, index) => {
+      const answer = answers[index];
+      if (answer !== undefined && answer !== question.answer) {
+        indexes.push(index);
+      }
+      return indexes;
+    }, []);
+
+    if (wrongIndexes.length === 0) {
       setMode('results');
       return;
     }
-    setQuizQuestions(incorrectQuestions.map(i => quizQuestions[i]));
+
+    setQuizQuestions(wrongIndexes.map(i => quizQuestions[i]));
     setCurrentIndex(0);
     setSelectedOption(null);
     setAnswers([]);
     setTimeLeft(30);
-    setScore(0);
-    setTotalTime(0);
-    setIncorrectQuestions([]);
     setMode('review');
     setAnimationKey(prev => prev + 1);
   };
@@ -2535,22 +2525,6 @@ export default function App() {
     fontWeight: '500',
     fontSize: '16px',
     padding: '12px 20px',
-  };
-
-  const progressBarStyle = {
-    width: '100%',
-    height: '8px',
-    background: '#ddd',
-    borderRadius: '4px',
-    overflow: 'hidden',
-    margin: '10px 0',
-  };
-
-  const progressFillStyle = {
-    height: '100%',
-    background: timeLeft <= 10 ? '#FF5722' : '#4CAF50',
-    width: `${(timeLeft / 30) * 100}%`,
-    transition: 'width 1s linear, background 0.3s',
   };
 
   // Select Mode
@@ -2667,115 +2641,153 @@ export default function App() {
     const currentQ = quizQuestions[currentIndex];
     if (!currentQ) return <div>Error</div>;
 
+    const answeredCount = answers.filter(answer => answer !== undefined).length;
+    const totalQuestions = quizQuestions.length;
+    const progressWidth = totalQuestions ? ((answeredCount / totalQuestions) * 100) : 0;
+
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        <div style={{
-          ...glassStyle,
-          padding: '30px',
-          maxWidth: '800px',
-          width: '100%',
-          animation: 'slideIn 0.5s ease-in',
-        }} key={animationKey}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ color: '#fff', margin: '0' }}>{mode === 'review' ? 'Review Mode' : 'Exam'}</h3>
-              <p style={{ color: '#e0e0e0', margin: '5px 0', fontSize: '14px' }}>
-                Question {currentIndex + 1} of {quizQuestions.length}
-              </p>
+      <div className="app-container quiz-screen">
+        <div className="premium-header">
+          <div className="header-content">
+            <span className="eyebrow">SPOM Exam Portal</span>
+            <h1>{mode === 'review' ? 'Review Session' : 'Entrepreneurship & Start-Up Ecosystem'}</h1>
+            <p>Experience a premium exam interface with a smart question palette, live timer, and powerful review flow.</p>
+          </div>
+
+          <div className="status-grid">
+            <div className="status-card status-highlight">
+              <span>Live Timer</span>
+              <strong className={timeLeft <= 10 ? 'urgent' : ''}>{formatTime(timeLeft)}</strong>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ color: '#4CAF50', margin: '0', fontSize: '18px' }}>Score: {score}</p>
-              <div style={{
-                position: 'fixed',
-                top: '20px',
-                right: '20px',
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: timeLeft <= 10 ? '#FF5722' : '#fff',
-                padding: '10px',
-                background: timeLeft <= 10 ? 'rgba(255,0,0,0.8)' : 'rgba(0,0,0,0.8)',
-                borderRadius: '8px',
-                animation: timeLeft <= 10 ? 'pulse 1s infinite' : 'none',
-                zIndex: 100,
-              }}>
-                ⏱️ {timeLeft}s
-              </div>
-              <div style={progressBarStyle}>
-                <div style={progressFillStyle}></div>
-              </div>
+            <div className="status-card">
+              <span>Progress</span>
+              <strong>{currentIndex + 1}/{totalQuestions}</strong>
             </div>
-          </div>
-
-          {/* Question */}
-          <div style={{
-            background: 'rgba(255,255,255,0.1)',
-            padding: '20px',
-            borderRadius: '10px',
-            marginBottom: '20px',
-            color: '#fff',
-          }}>
-            <h2 style={{ margin: '0', fontSize: '18px', lineHeight: '1.6' }}>
-              {currentQ.question}
-            </h2>
-          </div>
-
-          {/* Options */}
-          <div style={{ marginBottom: '20px' }}>
-            {currentQ.options.map((option, idx) => (
-              <button
-                key={idx}
-                className={answers[currentIndex] === option ? 'selected-option' : 'option-button'}
-                onClick={() => handleOptionSelect(option)}
-              >
-                {String.fromCharCode(65 + idx)}. {option}
-              </button>
-            ))}
-          </div>
-
-          {/* Buttons */}
-          <div className="navigation-buttons">
-            <button
-              onClick={handlePrevious}
-              disabled={currentIndex === 0}
-            >
-              Previous
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={!answers[currentIndex] && !selectedOption}
-            >
-              {currentIndex === quizQuestions.length - 1 ? 'Finish' : 'Save & Next'}
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', marginTop: '10px' }}>
-            <button
-              onClick={() => setShowEndConfirm(true)}
-              style={{
-                ...buttonStyle,
-                background: '#FF5722',
-                color: '#fff',
-                flex: 1,
-              }}
-            >
+            <div className="status-card">
+              <span>Correct</span>
+              <strong>{score}</strong>
+            </div>
+            <button className="end-exam-button" onClick={() => setShowEndConfirm(true)}>
               End Exam
             </button>
           </div>
-
-          <p style={{ color: '#e0e0e0', fontSize: '14px', textAlign: 'center' }}>
-            <b>Chapter:</b> {currentQ.chapter}
-          </p>
         </div>
 
-        {/* End Exam Confirmation Modal */}
+        <div className="progress-box quiz-progress">
+          <div className="progress-meta">
+            <span>{answeredCount} answered</span>
+            <span>{totalQuestions - answeredCount} remaining</span>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progressWidth}%` }}></div>
+          </div>
+        </div>
+
+        <div className="exam-layout">
+          <section className="question-panel">
+            <div className="question-card" key={animationKey}>
+              <div className="question-card-header">
+                <div>
+                  <span className="question-pill">Question {currentIndex + 1}</span>
+                  <p className="chapter-label">{currentQ.chapter}</p>
+                </div>
+                <button
+                  className={`flag-button ${reviewFlags[currentIndex] ? 'active' : ''}`}
+                  onClick={toggleReviewFlag}
+                >
+                  {reviewFlags[currentIndex] ? 'Marked for Review' : 'Mark for Review'}
+                </button>
+              </div>
+
+              <h2 className="question-title">{currentQ.question}</h2>
+
+              <div className="options-grid">
+                {currentQ.options.map((option, idx) => {
+                  const isSelected = answers[currentIndex] === option;
+                  return (
+                    <button
+                      key={idx}
+                      className={`option-button ${isSelected ? 'selected-option' : ''}`}
+                      onClick={() => handleOptionSelect(option)}
+                    >
+                      <strong>{String.fromCharCode(65 + idx)}.</strong> {option}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="question-actions">
+                <button className="secondary-button" onClick={handlePrevious} disabled={currentIndex === 0}>
+                  Previous
+                </button>
+                <button className="primary-button" onClick={handleNext} disabled={answers[currentIndex] === undefined}>
+                  {currentIndex === totalQuestions - 1 ? 'Finish Exam' : 'Save & Next'}
+                </button>
+              </div>
+            </div>
+
+            <div className="motivation-banner">
+              <div>
+                <p>Study with confidence. Every answer is saved instantly and your exam flow stays smooth across chapters.</p>
+              </div>
+            </div>
+          </section>
+
+          <aside className="sidebar">
+            <div className="palette-card">
+              <div className="palette-title">
+                <div>
+                  <h3>Question Palette</h3>
+                  <p>Quick access to every question</p>
+                </div>
+                <span className="palette-count">{totalQuestions}</span>
+              </div>
+              <div className="palette-grid">
+                {quizQuestions.map((_, idx) => (
+                  <button
+                    key={idx}
+                    className={`palette-item ${currentIndex === idx ? 'current' : ''} ${getQuestionStatus(idx)}`}
+                    onClick={() => setCurrentIndex(idx)}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+              </div>
+              <div className="palette-legend">
+                <div><span className="legend-dot answered" /> Answered</div>
+                <div><span className="legend-dot unanswered" /> Unanswered</div>
+                <div><span className="legend-dot review" /> Review</div>
+                <div><span className="legend-dot current" /> Current</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div className="social-section">
+          <div className="developer-card">
+            <h3>Developed by Manshu Deswal</h3>
+            <div className="social-links">
+              <a href="https://www.linkedin.com/in/manshu2036?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" rel="noreferrer">
+                <FaLinkedin /> LinkedIn
+              </a>
+              <a href="https://www.instagram.com/manshu__deswal?igsh=MWt4bmc1aGxmbXgwbA==" target="_blank" rel="noreferrer">
+                <FaInstagram /> Instagram
+              </a>
+            </div>
+          </div>
+          <div className="developer-card">
+            <h3>Reviewed by Ritik Gupta</h3>
+            <div className="social-links">
+              <a href="https://www.linkedin.com/in/ritik-gupta-a326b827a?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" rel="noreferrer">
+                <FaLinkedin /> LinkedIn
+              </a>
+              <a href="https://www.instagram.com/__ritik_gupta_?igsh=MWo0enZ3djJhMW8yYQ==" target="_blank" rel="noreferrer">
+                <FaInstagram /> Instagram
+              </a>
+            </div>
+          </div>
+        </div>
+
         {showEndConfirm && (
           <div style={{
             position: 'fixed',
@@ -2790,28 +2802,34 @@ export default function App() {
             zIndex: 1000,
           }}>
             <div style={{
-              background: '#fff',
+              background: '#0f172a',
               padding: '30px',
-              borderRadius: '15px',
-              maxWidth: '400px',
+              borderRadius: '22px',
+              maxWidth: '420px',
               width: '90%',
               textAlign: 'center',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
+              color: '#e2e8f0',
             }}>
-              <h2 style={{ color: '#333', marginBottom: '20px' }}>Confirm End Exam</h2>
-              <p style={{ color: '#666', marginBottom: '20px' }}>
-                You have {quizQuestions.length - currentIndex - (selectedOption ? 1 : 0)} unanswered questions.
+              <h2 style={{ marginBottom: '20px' }}>Confirm End Exam</h2>
+              <p style={{ color: '#94a3b8', marginBottom: '25px' }}>
+                You have {totalQuestions - answeredCount} unanswered questions.
                 Are you sure you want to submit?
               </p>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => {
                     setShowEndConfirm(false);
                     endExam();
                   }}
                   style={{
-                    ...buttonStyle,
-                    background: '#FF5722',
+                    border: 'none',
+                    borderRadius: '16px',
+                    padding: '14px 22px',
+                    background: '#fb7185',
                     color: '#fff',
+                    cursor: 'pointer',
+                    fontWeight: 700,
                   }}
                 >
                   Yes, Submit
@@ -2819,9 +2837,13 @@ export default function App() {
                 <button
                   onClick={() => setShowEndConfirm(false)}
                   style={{
-                    ...buttonStyle,
-                    background: '#ccc',
-                    color: '#333',
+                    border: '1px solid rgba(203,213,225,0.45)',
+                    borderRadius: '16px',
+                    padding: '14px 22px',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#e2e8f0',
+                    cursor: 'pointer',
+                    fontWeight: 700,
                   }}
                 >
                   Cancel
@@ -2831,114 +2853,11 @@ export default function App() {
           </div>
         )}
 
-        <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal | Reviewed by Ritik Gupta
-        </footer>
+        <footer className="footer-note">Developed by Manshu Deswal | Reviewed by Ritik Gupta</footer>
       </div>
     );
   }
 
-  // Review Mode Prompt
-  if (mode === 'review' && incorrectQuestions.length > 0) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <div style={{
-          ...glassStyle,
-          padding: '40px',
-          maxWidth: '600px',
-          width: '100%',
-          textAlign: 'center',
-          animation: 'fadeIn 0.5s ease-in',
-        }}>
-          <h1 style={{ color: '#fff', marginBottom: '20px' }}>Review Incorrect Questions</h1>
-          <p style={{ color: '#e0e0e0', marginBottom: '30px' }}>
-            You have {incorrectQuestions.length} incorrect questions. Review them now?
-          </p>
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-            <button
-              onClick={startReview}
-              style={{
-                ...buttonStyle,
-                background: '#4CAF50',
-                color: '#fff',
-              }}
-            >
-              Start Review
-            </button>
-            <button
-              onClick={() => setMode('results')}
-              style={{
-                ...buttonStyle,
-                background: '#FF9800',
-                color: '#fff',
-              }}
-            >
-              Skip to Results
-            </button>
-          </div>
-          <div className="social-section">
-            <h2>Connect With Us</h2>
-            <div className="developer-card">
-              <h3>Developed by Manshu Deswal</h3>
-              <div className="social-links">
-                <a
-                  href="https://www.linkedin.com/in/manshu2036?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FaLinkedin />
-                  LinkedIn
-                </a>
-                <a
-                  href="https://www.instagram.com/manshu__deswal?igsh=MWt4bmc1aGxmbXgwbA=="
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FaInstagram />
-                  Instagram
-                </a>
-              </div>
-            </div>
-            <div className="developer-card">
-              <h3>Reviewed & Suggested by Ritik Gupta</h3>
-              <div className="social-links">
-                <a
-                  href="https://www.linkedin.com/in/ritik-gupta-a326b827a?utm_source=share_via&utm_content=profile&utm_medium=member_ios"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FaLinkedin />
-                  LinkedIn
-                </a>
-                <a
-                  href="https://www.instagram.com/__ritik_gupta_?igsh=MWo0enZ3djJhMW8yYQ=="
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FaInstagram />
-                  Instagram
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
-          Developed by Manshu Deswal | Reviewed by Ritik Gupta
-        </footer>
-      </div>
-    );
-  }
-
-  // Results Mode
   if (mode === 'results') {
     const totalQuestions = quizQuestions.length;
     const correct = score;
@@ -3146,7 +3065,7 @@ export default function App() {
           </div>
 
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={restartQuiz}
               style={{
@@ -3156,6 +3075,16 @@ export default function App() {
               }}
             >
               Restart Exam
+            </button>
+            <button
+              onClick={startReview}
+              style={{
+                ...buttonStyle,
+                background: '#f59e0b',
+                color: '#fff',
+              }}
+            >
+              Review Incorrect Answers
             </button>
             <button
               onClick={() => setMode('select')}
