@@ -2276,6 +2276,7 @@ export default function App() {
   const [chapterScores, setChapterScores] = useState({});
   const [animationKey, setAnimationKey] = useState(0); // for animations
   const [wrongAnswers, setWrongAnswers] = useState([]);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   function shuffleArray(arr) {
     return [...arr].sort(() => Math.random() - 0.5);
@@ -2547,6 +2548,12 @@ export default function App() {
             @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
           `}
         </style>
+        <div className="hero-header">
+          <h1>PAPER 3: ENTREPRENEURSHIP & START-UP ECOSYSTEM</h1>
+          <p>
+            ICAI Self-Paced Online Module (SPOM) Examination Portal
+          </p>
+        </div>
         <div style={{
           ...glassStyle,
           padding: '40px',
@@ -2661,13 +2668,17 @@ export default function App() {
             <div style={{ textAlign: 'right' }}>
               <p style={{ color: '#4CAF50', margin: '0', fontSize: '18px' }}>Score: {score}</p>
               <div style={{
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
                 fontSize: '24px',
                 fontWeight: 'bold',
                 color: timeLeft <= 10 ? '#FF5722' : '#fff',
                 padding: '10px',
-                background: timeLeft <= 10 ? 'rgba(255,0,0,0.2)' : 'rgba(255,255,255,0.1)',
+                background: timeLeft <= 10 ? 'rgba(255,0,0,0.8)' : 'rgba(0,0,0,0.8)',
                 borderRadius: '8px',
                 animation: timeLeft <= 10 ? 'pulse 1s infinite' : 'none',
+                zIndex: 100,
               }}>
                 ⏱️ {timeLeft}s
               </div>
@@ -2744,7 +2755,7 @@ export default function App() {
               {currentIndex === quizQuestions.length - 1 ? 'Finish' : 'Next'}
             </button>
             <button
-              onClick={endExam}
+              onClick={() => setShowEndConfirm(true)}
               style={{
                 ...buttonStyle,
                 background: '#FF5722',
@@ -2760,6 +2771,63 @@ export default function App() {
             <b>Chapter:</b> {currentQ.chapter}
           </p>
         </div>
+
+        {/* End Exam Confirmation Modal */}
+        {showEndConfirm && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}>
+            <div style={{
+              background: '#fff',
+              padding: '30px',
+              borderRadius: '15px',
+              maxWidth: '400px',
+              width: '90%',
+              textAlign: 'center',
+            }}>
+              <h2 style={{ color: '#333', marginBottom: '20px' }}>Confirm End Exam</h2>
+              <p style={{ color: '#666', marginBottom: '20px' }}>
+                You have {quizQuestions.length - currentIndex - (selectedOption ? 1 : 0)} unanswered questions.
+                Are you sure you want to submit?
+              </p>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    setShowEndConfirm(false);
+                    endExam();
+                  }}
+                  style={{
+                    ...buttonStyle,
+                    background: '#FF5722',
+                    color: '#fff',
+                  }}
+                >
+                  Yes, Submit
+                </button>
+                <button
+                  onClick={() => setShowEndConfirm(false)}
+                  style={{
+                    ...buttonStyle,
+                    background: '#ccc',
+                    color: '#333',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <footer style={{ marginTop: '20px', color: '#e0e0e0', fontSize: '14px' }}>
           Developed by Manshu Deswal
         </footer>
@@ -2826,8 +2894,10 @@ export default function App() {
   if (mode === 'results') {
     const totalQuestions = quizQuestions.length;
     const correct = score;
-    const incorrect = totalQuestions - correct;
-    const percentage = ((correct / totalQuestions) * 100).toFixed(2);
+    const attempted = answers.filter(a => a !== undefined).length;
+    const incorrect = attempted - correct;
+    const skipped = totalQuestions - attempted;
+    const percentage = attempted > 0 ? ((correct / attempted) * 100).toFixed(2) : 0;
     const weakChapters = getWeakChapters();
 
     return (
@@ -2858,9 +2928,9 @@ export default function App() {
             textAlign: 'center',
           }}>
             <h2 style={{ color: '#4CAF50', margin: '10px 0', fontSize: '48px' }}>
-              {correct} / {totalQuestions}
+              {correct} / {attempted}
             </h2>
-            <p style={{ color: '#e0e0e0', fontSize: '18px' }}>{percentage}%</p>
+            <p style={{ color: '#e0e0e0', fontSize: '18px' }}>Accuracy: {percentage}%</p>
             <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '20px' }}>
               <div>
                 <p style={{ color: '#4CAF50', fontSize: '24px', margin: '0' }}>{correct}</p>
@@ -2868,7 +2938,11 @@ export default function App() {
               </div>
               <div>
                 <p style={{ color: '#FF5722', fontSize: '24px', margin: '0' }}>{incorrect}</p>
-                <p style={{ color: '#e0e0e0' }}>Incorrect</p>
+                <p style={{ color: '#e0e0e0' }}>Wrong</p>
+              </div>
+              <div>
+                <p style={{ color: '#FFC107', fontSize: '24px', margin: '0' }}>{skipped}</p>
+                <p style={{ color: '#e0e0e0' }}>Skipped</p>
               </div>
               <div>
                 <p style={{ color: '#fff', fontSize: '24px', margin: '0' }}>{formatTime(totalTime)}</p>
@@ -2926,21 +3000,33 @@ export default function App() {
             </div>
           )}
 
-          {/* Wrong Answers Review */}
-          {wrongAnswers.length > 0 && (
-            <div style={{
-              background: 'rgba(255,255,255,0.1)',
-              padding: '20px',
-              borderRadius: '15px',
-              marginBottom: '30px',
-            }}>
-              <h3 style={{ color: '#fff', marginBottom: '15px' }}>📚 Wrong Answers Review</h3>
-              {wrongAnswers.map((q, i) => (
+          {/* Full Attempt Review */}
+          <div style={{
+            background: 'rgba(255,255,255,0.1)',
+            padding: '20px',
+            borderRadius: '15px',
+            marginBottom: '30px',
+          }}>
+            <h3 style={{ color: '#fff', marginBottom: '15px' }}>📚 Full Attempt Review</h3>
+            {quizQuestions.map((q, i) => {
+              const selected = answers[i];
+              const isAttempted = selected !== undefined;
+              const isCorrect = selected === q.answer;
+              return (
                 <div key={i} style={{ marginBottom: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
-                  <p style={{ color: '#fff', margin: '0 0 10px 0' }}><b>Q:</b> {q.question}</p>
+                  <p style={{ color: '#fff', margin: '0 0 10px 0' }}><b>Q{i+1}:</b> {q.question}</p>
                   {q.options.map((option, idx) => {
-                    const isSelected = option === q.selected;
-                    const isCorrect = option === q.answer;
+                    const isSelected = option === selected;
+                    const isCorrectOption = option === q.answer;
+                    let bgColor = '#fff';
+                    let label = '';
+                    if (isCorrectOption) {
+                      bgColor = '#c8f7c5';
+                      label = ' ✅ Correct Answer';
+                    } else if (isSelected && !isCorrect) {
+                      bgColor = '#f7c5c5';
+                      label = ' ❌ Your Choice';
+                    }
                     return (
                       <div
                         key={idx}
@@ -2949,21 +3035,20 @@ export default function App() {
                           marginBottom: '8px',
                           borderRadius: '6px',
                           border: '1px solid #ccc',
-                          backgroundColor: isCorrect ? '#c8f7c5' : isSelected ? '#f7c5c5' : '#fff',
+                          backgroundColor: bgColor,
                           color: '#000',
                         }}
                       >
-                        {option}
-                        {isSelected && !isCorrect && <span> ❌ Your Answer</span>}
-                        {isCorrect && <span> ✅ Correct Answer</span>}
+                        {option}{label}
                       </div>
                     );
                   })}
+                  {!isAttempted && <p style={{ color: '#FFC107', margin: '0' }}>⚠️ Not Attempted</p>}
                   <p style={{ color: '#e0e0e0', margin: '0' }}><b>Explanation:</b> {q.explanation || "No explanation available"}</p>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
 
           {/* Buttons */}
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
